@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.46",
+    "@supabase/supabase-js": "^2.100.1",
     "idb": "^8.0.0",
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",

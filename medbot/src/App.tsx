@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "./lib/supabaseClient";
+import { Session } from "@supabase/supabase-js";
+import Auth from "./components/Auth";
 import { v4 as uuid } from "uuid";
 import {
   MedicalBot,
@@ -57,6 +60,10 @@ const App: React.FC = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
+  // Auth state
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Emergency fab
   const [showEmergencyFab, setShowEmergencyFab] = useState(false);
 
@@ -67,8 +74,21 @@ const App: React.FC = () => {
     createdAt: Date;
   } | null>(null);
 
-  // Load conversations on mount
+  // Auth and load conversations on mount
   useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
     loadAllConversations();
     
     // Environment diagnostics
@@ -84,6 +104,8 @@ const App: React.FC = () => {
     if (!hasWebGPU || !hasSAB) {
       setLoadingText(`⚠️ Alerte Environnement: ${!hasWebGPU ? "WebGPU absent. " : ""}${!hasSAB ? "SharedArrayBuffer absent (vérifiez les en-têtes)." : ""}`);
     }
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const loadAllConversations = async () => {
@@ -307,6 +329,27 @@ const App: React.FC = () => {
     setCurrentEmergency(null);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-sky-50/30">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center animate-pulse shadow-lg shadow-blue-500/20">
+            <Heart className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-slate-400 font-medium animate-pulse">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
   if (view === "loader") {
     return (
       <ModelLoader
@@ -390,6 +433,27 @@ const App: React.FC = () => {
             title="Nouvelle conversation"
           >
             <Plus className="w-4 h-4" />
+          </button>
+
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-red-600 transition-all border border-slate-200/50"
+            title="Se déconnecter"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
           </button>
         </div>
       </nav>
